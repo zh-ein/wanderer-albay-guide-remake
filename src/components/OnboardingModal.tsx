@@ -28,25 +28,52 @@ interface Subcategory {
 
 interface UserPreferences {
   categories: string[];
+  subcategories: string[];
   districts: string[];
+  travelStyle: string;
+  travelPace: string;
 }
 
 export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalProps) => {
   const [step, setStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 7;
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences>({
     categories: [],
+    subcategories: [],
     districts: [],
+    travelStyle: "",
+    travelPace: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  const categoryOptions = [
-    { name: "Nature", icon: "🌿", description: "Mountains, lakes, and natural wonders" },
-    { name: "Culture", icon: "🎭", description: "Churches, heritage sites, and festivals" },
-    { name: "Adventure", icon: "🧗", description: "Hiking, ziplines, and outdoor activities" },
-    { name: "Food", icon: "🍴", description: "Local cuisine, cafés, and traditional dishes" },
-    { name: "Beach", icon: "🏖️", description: "Resorts, island hopping, and sunset spots" },
-  ];
+  useEffect(() => {
+    fetchCategories();
+    fetchSubcategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name");
+
+    if (!error && data) {
+      setCategories(data);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    const { data, error } = await supabase
+      .from("subcategories")
+      .select("*")
+      .order("name");
+
+    if (!error && data) {
+      setSubcategories(data);
+    }
+  };
 
   const districtOptions = [
     { name: "District 1", subtitle: "Coastal Wonders", icon: "🐚" },
@@ -85,7 +112,13 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
       case 2:
         return preferences.categories.length > 0;
       case 3:
+        return preferences.subcategories.length > 0;
+      case 4:
         return preferences.districts.length > 0;
+      case 5:
+        return preferences.travelStyle !== "";
+      case 6:
+        return preferences.travelPace !== "";
       default:
         return true;
     }
@@ -100,6 +133,15 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
     }));
   };
 
+  const toggleSubcategory = (subcategoryName: string) => {
+    setPreferences((prev) => ({
+      ...prev,
+      subcategories: prev.subcategories.includes(subcategoryName)
+        ? prev.subcategories.filter((s) => s !== subcategoryName)
+        : [...prev.subcategories, subcategoryName],
+    }));
+  };
+
   const toggleDistrict = (district: string) => {
     setPreferences((prev) => ({
       ...prev,
@@ -107,6 +149,18 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
         ? prev.districts.filter((d) => d !== district)
         : [...prev.districts, district],
     }));
+  };
+
+  const getFilteredSubcategories = () => {
+    if (preferences.categories.length === 0) return subcategories;
+    
+    const selectedCategoryIds = categories
+      .filter((c) => preferences.categories.includes(c.name))
+      .map((c) => c.id);
+    
+    return subcategories.filter((s) =>
+      selectedCategoryIds.includes(s.category_id)
+    );
   };
 
   const renderStep = () => {
@@ -124,7 +178,7 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
               Your Smart Albay Travel Companion!
             </p>
             <p className="text-muted-foreground">
-              Let's personalize your adventure with a few quick questions to create the perfect itinerary for your journey.
+              Let's personalize your travel experience with a few quick questions.
             </p>
           </div>
         );
@@ -135,17 +189,17 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="w-6 h-6 text-accent" />
-                Personalize Your Albay Adventure
+                Choose What You Love
               </CardTitle>
               <CardDescription>
-                Select your interests and we'll recommend the perfect destinations for your journey
+                What kind of traveler are you? Select all that match your interests
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid sm:grid-cols-2 gap-4">
-                {categoryOptions.map((category) => (
+                {categories.map((category) => (
                   <div
-                    key={category.name}
+                    key={category.id}
                     onClick={() => toggleCategory(category.name)}
                     className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
                       preferences.categories.includes(category.name)
@@ -163,9 +217,6 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
                           <span className="text-2xl">{category.icon}</span>
                           <h3 className="font-semibold text-lg">{category.name}</h3>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {category.description}
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -179,9 +230,49 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
         return (
           <Card className="border-2 shadow-lg animate-fade-in">
             <CardHeader>
+              <CardTitle>Select Subcategories</CardTitle>
+              <CardDescription>
+                Choose specific activities and experiences you'd like
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
+                {getFilteredSubcategories().map((subcategory) => (
+                  <div
+                    key={subcategory.id}
+                    onClick={() => toggleSubcategory(subcategory.name)}
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                      preferences.subcategories.includes(subcategory.name)
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={preferences.subcategories.includes(subcategory.name)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium">{subcategory.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {subcategory.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 4:
+        return (
+          <Card className="border-2 shadow-lg animate-fade-in">
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="w-6 h-6 text-primary" />
-                Choose Your Districts
+                Choose Districts in Albay
               </CardTitle>
               <CardDescription>
                 Which parts of Albay would you like to explore?
@@ -217,6 +308,102 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
               ))}
             </CardContent>
           </Card>
+        );
+
+      case 5:
+        return (
+          <Card className="border-2 shadow-lg animate-fade-in">
+            <CardHeader>
+              <CardTitle>Choose Travel Style</CardTitle>
+              <CardDescription>Who are you traveling with?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { name: "Solo", icon: "🚶" },
+                  { name: "Couple", icon: "💑" },
+                  { name: "Family", icon: "👨‍👩‍👧" },
+                  { name: "Friends", icon: "👥" },
+                ].map((style) => (
+                  <div
+                    key={style.name}
+                    onClick={() =>
+                      setPreferences((prev) => ({ ...prev, travelStyle: style.name }))
+                    }
+                    className={`p-6 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                      preferences.travelStyle === style.name
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="text-center space-y-2">
+                      <div className="text-4xl">{style.icon}</div>
+                      <p className="font-medium">{style.name}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 6:
+        return (
+          <Card className="border-2 shadow-lg animate-fade-in">
+            <CardHeader>
+              <CardTitle>Choose Travel Pace</CardTitle>
+              <CardDescription>
+                What kind of travel experience do you prefer?
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4">
+                {[
+                  { name: "Relaxing", icon: "🕊️", desc: "Take it slow and enjoy the moments" },
+                  { name: "Thrilling", icon: "⚡", desc: "Packed with action and adventure" },
+                  { name: "Balanced", icon: "🎒", desc: "Mix of relaxation and exploration" },
+                ].map((pace) => (
+                  <div
+                    key={pace.name}
+                    onClick={() =>
+                      setPreferences((prev) => ({ ...prev, travelPace: pace.name }))
+                    }
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                      preferences.travelPace === pace.name
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="text-4xl">{pace.icon}</div>
+                      <div>
+                        <p className="font-bold text-lg">{pace.name}</p>
+                        <p className="text-sm text-muted-foreground">{pace.desc}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 7:
+        return (
+          <div className="text-center space-y-6 py-8 animate-fade-in">
+            <div className="text-6xl">🌋</div>
+            <h2 className="text-3xl font-bold">Thanks, Traveler!</h2>
+            <p className="text-lg text-muted-foreground">
+              Your Wanderer profile is ready.
+            </p>
+            <div className="text-sm text-muted-foreground space-y-2 text-left max-w-md mx-auto bg-muted/30 p-6 rounded-lg">
+              <p>📍 <strong>Districts:</strong> {preferences.districts.join(", ")}</p>
+              <p>🎯 <strong>Interests:</strong> {preferences.categories.join(", ")}</p>
+              <p>✨ <strong>Activities:</strong> {preferences.subcategories.slice(0, 3).join(", ")}{preferences.subcategories.length > 3 ? "..." : ""}</p>
+              <p>👥 <strong>Travel Style:</strong> {preferences.travelStyle}</p>
+              <p>⚡ <strong>Pace:</strong> {preferences.travelPace}</p>
+            </div>
+          </div>
         );
 
       default:
@@ -274,10 +461,10 @@ export const OnboardingModal = ({ open, onComplete, userId }: OnboardingModalPro
             </Button>
           </div>
 
-          {step > 1 && (
+          {step > 1 && step < totalSteps && (
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                Step {step - 1} of {totalSteps - 1}
+                Step {step - 1} of {totalSteps - 2}
               </p>
             </div>
           )}

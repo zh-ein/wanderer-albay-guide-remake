@@ -4,27 +4,62 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
 import HiddenGemsSection from "@/components/HiddenGemsSection";
+import { OnboardingModal } from "@/components/OnboardingModal";
 import { Sparkles, Mountain, UtensilsCrossed, Church, Waves, MapPin, ArrowRight } from "lucide-react";
 import heroImage from "@/assets/hero-mayon.jpg";
 import { supabase } from "@/integrations/supabase/client";
+import { Session } from "@supabase/supabase-js";
 
 const Index = () => {
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAuthenticated(!!session);
+      setSession(session);
+      if (session?.user) {
+        setUserId(session.user.id);
+        checkOnboardingStatus(session.user.id);
+      }
     });
 
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
+      setSession(session);
+      if (session?.user) {
+        setUserId(session.user.id);
+        setTimeout(() => {
+          checkOnboardingStatus(session.user.id);
+        }, 0);
+      } else {
+        setShowOnboarding(false);
+        setUserId(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkOnboardingStatus = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("onboarding_complete")
+      .eq("id", userId)
+      .single();
+
+    if (!error && data && !data.onboarding_complete) {
+      setShowOnboarding(true);
+    }
+  };
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
 
   const categories = [
     { icon: Mountain, label: "Nature", color: "from-secondary to-secondary/70" },
@@ -34,7 +69,7 @@ const Index = () => {
   ];
 
   const handleCategoryClick = (category: string) => {
-    if (!isAuthenticated) {
+    if (!session) {
       navigate("/auth");
     } else {
       navigate("/itinerary", { state: { preselectedCategory: category } });
@@ -66,7 +101,7 @@ const Index = () => {
   ];
 
   const handleFeatureClick = (route: string, requiresAuth: boolean) => {
-    if (requiresAuth && !isAuthenticated) {
+    if (requiresAuth && !session) {
       navigate("/auth");
     } else {
       navigate(route);
@@ -76,6 +111,15 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      
+      {/* Onboarding Modal */}
+      {showOnboarding && userId && (
+        <OnboardingModal
+          open={showOnboarding}
+          onComplete={handleOnboardingComplete}
+          userId={userId}
+        />
+      )}
       
       {/* Hero Section */}
       <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
@@ -102,7 +146,7 @@ const Index = () => {
             <Button
               size="lg"
               className="text-lg gap-2 shadow-xl hover:shadow-2xl transition-all"
-              onClick={() => navigate(isAuthenticated ? "/itinerary" : "/auth")}
+              onClick={() => navigate(session ? "/itinerary" : "/auth")}
             >
               <Sparkles className="w-5 h-5" />
               Build Your Itinerary
@@ -206,7 +250,7 @@ const Index = () => {
             size="lg"
             variant="secondary"
             className="text-lg gap-2 shadow-2xl hover:shadow-3xl transition-all"
-            onClick={() => navigate(isAuthenticated ? "/itinerary" : "/auth")}
+            onClick={() => navigate(session ? "/itinerary" : "/auth")}
           >
             Get Started Now
             <ArrowRight className="w-5 h-5" />
