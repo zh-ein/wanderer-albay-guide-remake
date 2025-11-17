@@ -4,17 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
 import HiddenGemsSection from "@/components/HiddenGemsSection";
+import PersonalizedFeed from "@/components/PersonalizedFeed";
 import { OnboardingModal } from "@/components/OnboardingModal";
-import { Sparkles, Mountain, UtensilsCrossed, Church, Waves, MapPin, ArrowRight } from "lucide-react";
+import { Sparkles, Mountain, UtensilsCrossed, Church, Waves, MapPin, ArrowRight, RefreshCw } from "lucide-react";
 import heroImage from "@/assets/hero-mayon.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
+import { toast } from "sonner";
 
 const Index = () => {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
 
   useEffect(() => {
     // Get initial session
@@ -48,17 +51,50 @@ const Index = () => {
   const checkOnboardingStatus = async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("onboarding_complete")
+      .select("onboarding_complete, user_preferences")
       .eq("id", userId)
       .single();
 
-    if (!error && data && !data.onboarding_complete) {
-      setShowOnboarding(true);
+    if (!error && data) {
+      if (!data.onboarding_complete || !data.user_preferences) {
+        setShowOnboarding(true);
+        setHasCompletedOnboarding(false);
+      } else {
+        setHasCompletedOnboarding(true);
+      }
     }
   };
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
+    setHasCompletedOnboarding(true);
+    if (userId) {
+      checkOnboardingStatus(userId);
+    }
+  };
+
+  const handleResetPreferences = async () => {
+    if (!userId) return;
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_complete: false,
+          user_preferences: null,
+          onboarding_answers: null
+        })
+        .eq("id", userId);
+
+      if (error) throw error;
+
+      setHasCompletedOnboarding(false);
+      setShowOnboarding(true);
+      toast.success("Preferences reset. Let's personalize your experience again!");
+    } catch (error) {
+      console.error("Error resetting preferences:", error);
+      toast.error("Failed to reset preferences");
+    }
   };
 
   const categories = [
@@ -121,8 +157,27 @@ const Index = () => {
         />
       )}
       
-      {/* Hero Section */}
-      <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
+      {/* Show Personalized Feed for users who completed onboarding */}
+      {session && hasCompletedOnboarding && userId ? (
+        <div className="container py-12">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-4xl font-bold mb-2">Welcome back, {session.user.user_metadata?.full_name || 'Traveler'}!</h1>
+                <p className="text-lg text-muted-foreground">Here's your personalized travel feed</p>
+              </div>
+              <Button variant="outline" onClick={handleResetPreferences}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reset Preferences
+              </Button>
+            </div>
+            <PersonalizedFeed userId={userId} />
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Hero Section */}
+          <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
           <img
             src={heroImage}
@@ -263,7 +318,9 @@ const Index = () => {
         <div className="container text-center text-muted-foreground">
           <p>© 2025 Wanderer. Optimizing tourist journeys around Albay.</p>
         </div>
-      </footer>
+          </footer>
+        </>
+      )}
     </div>
   );
 };
