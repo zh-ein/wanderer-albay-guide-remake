@@ -23,6 +23,13 @@ interface TouristSpot {
   rating: number;
 }
 
+interface Subcategory {
+  id: string;
+  name: string;
+  category_id: string | null;
+  description: string | null;
+}
+
 const Explore = () => {
   const navigate = useNavigate();
   const [spots, setSpots] = useState<TouristSpot[]>([]);
@@ -30,9 +37,12 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
 
   useEffect(() => {
     fetchSpots();
+    fetchSubcategories();
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
@@ -43,7 +53,26 @@ const Explore = () => {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    // Set up real-time subscription for subcategories
+    const subcategoriesChannel = supabase
+      .channel('subcategories-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subcategories'
+        },
+        () => {
+          fetchSubcategories();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(subcategoriesChannel);
+    };
   }, []);
 
   useEffect(() => {
@@ -58,6 +87,17 @@ const Explore = () => {
 
     if (!error && data) {
       setSpots(data);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    const { data, error } = await supabase
+      .from("subcategories")
+      .select("*")
+      .order("name");
+
+    if (!error && data) {
+      setSubcategories(data);
     }
   };
 
@@ -81,6 +121,12 @@ const Explore = () => {
 
   const categories = ["Nature", "Culture", "Adventure", "Food", "Beach", "Heritage"];
 
+  // Combine predefined categories with subcategories
+  const allCategories = [
+    ...categories,
+    ...subcategories.map(sub => sub.name)
+  ].sort();
+
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
       Nature: "bg-secondary text-secondary-foreground",
@@ -91,6 +137,10 @@ const Explore = () => {
       Heritage: "bg-purple-500 text-white",
     };
     return colors[category] || "bg-muted";
+  };
+
+  const getCategoryCount = (category: string) => {
+    return spots.filter(spot => spot.category.includes(category)).length;
   };
 
   return (
@@ -139,16 +189,16 @@ const Explore = () => {
                   size="sm"
                   onClick={() => setSelectedCategory(null)}
                 >
-                  All
+                  All ({spots.length})
                 </Button>
-                {categories.map((category) => (
+                {allCategories.map((category) => (
                   <Button
                     key={category}
                     variant={selectedCategory === category ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedCategory(category)}
                   >
-                    {category}
+                    {category} ({getCategoryCount(category)})
                   </Button>
                 ))}
               </div>
