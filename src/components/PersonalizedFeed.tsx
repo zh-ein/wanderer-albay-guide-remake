@@ -52,6 +52,8 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [preferences, setPreferences] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [autoAddEnabled, setAutoAddEnabled] = useState(false);
+  const [addedToItinerary, setAddedToItinerary] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const { favorites, visited, toggleFavorite, markAsVisited, isFavorite, isVisited } = useFavorites(userId);
 
@@ -64,6 +66,12 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
       fetchPersonalizedContent();
     }
   }, [preferences]);
+
+  useEffect(() => {
+    if (autoAddEnabled && spots.length > 0) {
+      handleAutoAddRecommendations();
+    }
+  }, [autoAddEnabled, spots]);
 
   const fetchUserPreferences = async () => {
     try {
@@ -254,6 +262,80 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
     }
   };
 
+  const addToItinerary = async (item: TouristSpot | Accommodation | Restaurant, type: 'spot' | 'accommodation' | 'restaurant') => {
+    try {
+      // Check if user already has an itinerary
+      const { data: existingItinerary, error: fetchError } = await supabase
+        .from("itineraries")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error("Error fetching itinerary:", fetchError);
+        return;
+      }
+
+      const itemData = {
+        id: item.id,
+        name: item.name,
+        location: item.location,
+        type: type
+      };
+
+      if (existingItinerary) {
+        // Update existing itinerary
+        const currentSpots = Array.isArray(existingItinerary.spots) ? existingItinerary.spots : [];
+        const alreadyAdded = currentSpots.some((s: any) => s.id === item.id);
+        
+        if (!alreadyAdded) {
+          const { error: updateError } = await supabase
+            .from("itineraries")
+            .update({
+              spots: [...currentSpots, itemData] as any
+            })
+            .eq("id", existingItinerary.id);
+
+          if (updateError) {
+            console.error("Error updating itinerary:", updateError);
+          } else {
+            setAddedToItinerary(prev => new Set(prev).add(item.id));
+          }
+        }
+      } else {
+        // Create new itinerary
+        const { error: insertError } = await supabase
+          .from("itineraries")
+          .insert({
+            user_id: userId,
+            name: "My Personalized Itinerary",
+            spots: [itemData],
+            selected_categories: preferences.categories || []
+          });
+
+        if (insertError) {
+          console.error("Error creating itinerary:", insertError);
+        } else {
+          setAddedToItinerary(prev => new Set(prev).add(item.id));
+        }
+      }
+    } catch (error) {
+      console.error("Error adding to itinerary:", error);
+    }
+  };
+
+  const handleAutoAddRecommendations = async () => {
+    // Auto-add top 5 recommended spots to itinerary
+    const topSpots = spots.slice(0, 5);
+    for (const spot of topSpots) {
+      if (!addedToItinerary.has(spot.id)) {
+        await addToItinerary(spot, 'spot');
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-12">
@@ -281,6 +363,26 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
 
   return (
     <div className="space-y-12 animate-fade-in">
+      {/* Auto-Add Toggle */}
+      <Card className="bg-primary/5 border-primary/20">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-lg mb-1">Auto-Add Recommendations</h3>
+              <p className="text-sm text-muted-foreground">
+                Automatically add top recommended spots to your itinerary based on your preferences
+              </p>
+            </div>
+            <Button
+              variant={autoAddEnabled ? "default" : "outline"}
+              onClick={() => setAutoAddEnabled(!autoAddEnabled)}
+            >
+              {autoAddEnabled ? "Enabled" : "Enable Auto-Add"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Personalized Tourist Spots */}
       {spots.length > 0 && (
         <section>
@@ -337,7 +439,7 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                     {spot.description}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -361,6 +463,25 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
                       <Heart className={`w-4 h-4 ${isFavorite(spot.id) ? 'fill-current' : ''}`} />
                     </Button>
                   </div>
+                  <Button
+                    variant={addedToItinerary.has(spot.id) ? "secondary" : "default"}
+                    size="sm"
+                    className="w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addToItinerary(spot, 'spot');
+                    }}
+                    disabled={addedToItinerary.has(spot.id)}
+                  >
+                    {addedToItinerary.has(spot.id) ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Added to Itinerary
+                      </>
+                    ) : (
+                      "Add to Itinerary"
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -405,9 +526,28 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
                   {acc.price_range && (
                     <Badge variant="secondary" className="mb-2">{acc.price_range}</Badge>
                   )}
-                  <p className="text-sm text-muted-foreground line-clamp-2">
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                     {acc.description}
                   </p>
+                  <Button
+                    variant={addedToItinerary.has(acc.id) ? "secondary" : "default"}
+                    size="sm"
+                    className="w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addToItinerary(acc, 'accommodation');
+                    }}
+                    disabled={addedToItinerary.has(acc.id)}
+                  >
+                    {addedToItinerary.has(acc.id) ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Added to Itinerary
+                      </>
+                    ) : (
+                      "Add to Itinerary"
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -446,9 +586,28 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
                   {rest.food_type && (
                     <Badge variant="secondary" className="mb-2">{rest.food_type}</Badge>
                   )}
-                  <p className="text-sm text-muted-foreground line-clamp-2">
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                     {rest.description}
                   </p>
+                  <Button
+                    variant={addedToItinerary.has(rest.id) ? "secondary" : "default"}
+                    size="sm"
+                    className="w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addToItinerary(rest, 'restaurant');
+                    }}
+                    disabled={addedToItinerary.has(rest.id)}
+                  >
+                    {addedToItinerary.has(rest.id) ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Added to Itinerary
+                      </>
+                    ) : (
+                      "Add to Itinerary"
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
             ))}
