@@ -13,15 +13,15 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 interface Accommodation {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   location: string;
-  municipality: string;
-  category: string[];
-  image_url: string;
-  contact_number: string;
-  email: string;
-  price_range: string;
-  amenities: string[];
+  municipality: string | null;
+  category: string[] | null;
+  image_url: string | null;
+  contact_number: string | null;
+  email: string | null;
+  price_range: string | null;
+  amenities: string[] | null;
   rating: number;
 }
 
@@ -34,6 +34,9 @@ interface Barangay {
   code: string;
   name: string;
 }
+
+const CATEGORY_OPTIONS = ["Luxury", "Beach Resort", "All-Inclusive", "Budget", "Hostel"];
+const AMENITIES_OPTIONS = ["WiFi", "Pool", "Restaurant", "Spa", "Parking", "Gym"];
 
 const ManageAccommodations = () => {
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
@@ -48,12 +51,12 @@ const ManageAccommodations = () => {
     description: "",
     location: "",
     municipality: "",
-    category: "",
+    category: [] as string[],
     image_url: "",
     contact_number: "",
     email: "",
     price_range: "",
-    amenities: "",
+    amenities: [] as string[],
     rating: 0,
   });
 
@@ -115,32 +118,33 @@ const ManageAccommodations = () => {
       description: "",
       location: "",
       municipality: "",
-      category: "",
+      category: [],
       image_url: "",
       contact_number: "",
       email: "",
       price_range: "",
-      amenities: "",
+      amenities: [],
       rating: 0,
     });
     setBarangays([]);
     setEditingId(null);
+    setIsOpen(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const accommodationData = {
-      ...formData,
-      category: formData.category.split(",").map((c) => c.trim()),
-      amenities: formData.amenities.split(",").map((a) => a.trim()),
-    };
+  ...formData,
+  // Remove .join
+  category: formData.category.length ? formData.category : null,
+  amenities: formData.amenities.length ? formData.amenities : null,
+};
 
     if (editingId) {
       const { error } = await supabase.from("accommodations").update(accommodationData).eq("id", editingId);
       if (error) toast.error("Failed to update accommodation");
       else {
         toast.success("Accommodation updated successfully");
-        setIsOpen(false);
         resetForm();
         fetchAccommodations();
       }
@@ -149,7 +153,6 @@ const ManageAccommodations = () => {
       if (error) toast.error("Failed to add accommodation");
       else {
         toast.success("Accommodation added successfully");
-        setIsOpen(false);
         resetForm();
         fetchAccommodations();
       }
@@ -162,12 +165,12 @@ const ManageAccommodations = () => {
       description: accommodation.description || "",
       location: accommodation.location,
       municipality: accommodation.municipality || "",
-      category: accommodation.category?.join(", ") || "",
+      category: accommodation.category || [],
       image_url: accommodation.image_url || "",
       contact_number: accommodation.contact_number || "",
       email: accommodation.email || "",
       price_range: accommodation.price_range || "",
-      amenities: accommodation.amenities?.join(", ") || "",
+      amenities: accommodation.amenities || [],
       rating: accommodation.rating || 0,
     });
     setEditingId(accommodation.id);
@@ -203,6 +206,7 @@ const ManageAccommodations = () => {
               <DialogTitle>{editingId ? "Edit Accommodation" : "Add New Accommodation"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name */}
               <div>
                 <Label htmlFor="name">Name *</Label>
                 <Input
@@ -212,6 +216,8 @@ const ManageAccommodations = () => {
                   required
                 />
               </div>
+
+              {/* Description */}
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -221,8 +227,9 @@ const ManageAccommodations = () => {
                   rows={3}
                 />
               </div>
+
+              {/* Municipality & Location */}
               <div className="grid grid-cols-2 gap-4">
-                {/* Municipality Dropdown */}
                 <div>
                   <Label htmlFor="municipality">Municipality</Label>
                   <Select
@@ -242,7 +249,6 @@ const ManageAccommodations = () => {
                   </Select>
                 </div>
 
-                {/* Location Dropdown */}
                 <div>
                   <Label htmlFor="location">Location</Label>
                   <Select
@@ -267,47 +273,118 @@ const ManageAccommodations = () => {
                 </div>
               </div>
 
+              {/* Category Multi-select */}
               <div>
-                <Label htmlFor="category">Categories (comma-separated)</Label>
-                <Input
-                  id="category"
-                  placeholder="Luxury, Beach Resort, All-Inclusive"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                />
+                <Label htmlFor="category">Categories</Label>
+                <Select
+                  onValueChange={(value) => {
+                    setFormData((prev) => {
+                      const alreadySelected = prev.category.includes(value);
+                      const updated = alreadySelected
+                        ? prev.category.filter((c) => c !== value)
+                        : [...prev.category, value];
+                      return { ...prev, category: updated };
+                    });
+                  }}
+                  value=""
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.category.length ? formData.category.join(", ") : "Select categories"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORY_OPTIONS.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.category.includes(cat)} readOnly />
+                          <span>{cat}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Amenities Multi-select */}
               <div>
-                <Label htmlFor="amenities">Amenities (comma-separated)</Label>
-                <Input
-                  id="amenities"
-                  placeholder="WiFi, Pool, Restaurant, Spa"
-                  value={formData.amenities}
-                  onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
-                />
+                <Label htmlFor="amenities">Amenities</Label>
+                <Select
+                  onValueChange={(value) => {
+                    setFormData((prev) => {
+                      const alreadySelected = prev.amenities.includes(value);
+                      const updated = alreadySelected
+                        ? prev.amenities.filter((a) => a !== value)
+                        : [...prev.amenities, value];
+                      return { ...prev, amenities: updated };
+                    });
+                  }}
+                  value=""
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.amenities.length ? formData.amenities.join(", ") : "Select amenities"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AMENITIES_OPTIONS.map((amenity) => (
+                      <SelectItem key={amenity} value={amenity}>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.amenities.includes(amenity)} readOnly />
+                          <span>{amenity}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Price & Rating */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="price_range">Price Range</Label>
                   <Input
                     id="price_range"
-                    placeholder="₱1,500 - ₱3,000"
                     value={formData.price_range}
                     onChange={(e) => setFormData({ ...formData, price_range: e.target.value })}
+                    placeholder= "₱ 1,500 - ₱3,000"
                   />
+                  
                 </div>
                 <div>
                   <Label htmlFor="rating">Rating (0-5)</Label>
                   <Input
-                    id="rating"
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.1"
-                    value={formData.rating}
-                    onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) })}
-                  />
+  id="rating"
+  type="number"
+  min={0}
+  max={5}
+  step={0.1}
+  value={formData.rating === 0 ? "" : formData.rating}
+  onChange={(e) => {
+    const raw = e.target.value;
+
+    // Allow clearing input
+    if (raw === "") {
+      setFormData({ ...formData, rating: 0 });
+      return;
+    }
+
+    const value = Number(raw);
+
+    // Ensure the value is between 0 and 5
+    if (value > 5) {
+      toast.error("Rating cannot be greater than 5");
+      return;
+    }
+    if (value < 0) {
+      toast.error("Rating cannot be less than 0");
+      return;
+    }
+
+    setFormData({ ...formData, rating: value });
+  }}
+   placeholder="0"
+/>
                 </div>
               </div>
+
+              {/* Image & Contact Info */}
               <div>
                 <Label htmlFor="image_url">Image URL</Label>
                 <Input
@@ -321,10 +398,26 @@ const ManageAccommodations = () => {
                 <div>
                   <Label htmlFor="contact_number">Contact Number</Label>
                   <Input
-                    id="contact_number"
-                    value={formData.contact_number}
-                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
-                  />
+  id="contact_number"
+  value={formData.contact_number}
+  onChange={(e) => {
+    const value = e.target.value;
+    if (/[^0-9+]/.test(value)) {
+      return;
+    }
+    if (value.indexOf('+') > 0) {
+      return;
+    }
+    if (value.length > 12) {
+      return;
+    }
+
+    setFormData({ ...formData, contact_number: value });
+  }}
+  placeholder="+63XXX-XXX-XXXX"
+/>
+
+
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
@@ -336,15 +429,10 @@ const ManageAccommodations = () => {
                   />
                 </div>
               </div>
+
+              {/* Form Actions */}
               <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsOpen(false);
-                    resetForm();
-                  }}
-                >
+                <Button type="button" variant="outline" onClick={resetForm}>
                   Cancel
                 </Button>
                 <Button type="submit">{editingId ? "Update" : "Add"} Accommodation</Button>
@@ -354,32 +442,33 @@ const ManageAccommodations = () => {
         </Dialog>
       </div>
 
+      {/* Accommodation Cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {accommodations.map((accommodation) => (
-          <Card key={accommodation.id}>
+        {accommodations.map((acc) => (
+          <Card key={acc.id}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-lg">{accommodation.name}</CardTitle>
+                  <CardTitle className="text-lg">{acc.name}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {accommodation.municipality || accommodation.location}
+                    {acc.municipality || acc.location}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="outline" onClick={() => handleEdit(accommodation)}>
+                  <Button size="icon" variant="outline" onClick={() => handleEdit(acc)}>
                     <Pencil className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="destructive" onClick={() => handleDelete(accommodation.id)}>
+                  <Button size="icon" variant="destructive" onClick={() => handleDelete(acc.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {accommodation.image_url ? (
+              {acc.image_url ? (
                 <img
-                  src={accommodation.image_url}
-                  alt={accommodation.name}
+                  src={acc.image_url}
+                  alt={acc.name}
                   className="w-full h-32 object-cover rounded mb-3"
                 />
               ) : (
@@ -387,10 +476,10 @@ const ManageAccommodations = () => {
                   <Building2 className="w-12 h-12 text-muted-foreground" />
                 </div>
               )}
-              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{accommodation.description}</p>
-              {accommodation.price_range && <p className="text-sm font-semibold mb-2">{accommodation.price_range}</p>}
-              {accommodation.category && accommodation.category.length > 0 && (
-                <p className="text-xs text-muted-foreground">{accommodation.category.join(", ")}</p>
+              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{acc.description}</p>
+              {acc.price_range && <p className="text-sm font-semibold mb-2">{acc.price_range}</p>}
+              {acc.category && acc.category.length > 0 && (
+                <p className="text-xs text-muted-foreground">{acc.category.join(", ")}</p>
               )}
             </CardContent>
           </Card>
