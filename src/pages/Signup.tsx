@@ -44,31 +44,20 @@ export default function Signup() {
         fullName,
       });
 
-      // Check if user already exists in Supabase Auth
-      if (contactType === 'email') {
-        const { data: existingUser } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', validatedData.contact)
-          .maybeSingle();
-        
-        if (existingUser) {
-          toast.error('An account with this email already exists. Please login instead.');
-          setIsLoading(false);
-          return;
-        }
-      }
-
       // Send OTP
-      const response = await supabase.functions.invoke('send-otp', {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           contact: validatedData.contact,
           contactType,
-        },
+        }),
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to send OTP');
+      if (!response.ok) {
+        throw new Error('Failed to send OTP');
       }
 
       // Store signup data in session storage for OTP verification
@@ -88,7 +77,7 @@ export default function Signup() {
         });
       } else {
         console.error('Signup error:', error);
-        toast.error(error.message || 'Failed to send verification code. Please try again.');
+        toast.error(error.message || 'Failed to send verification code');
       }
     } finally {
       setIsLoading(false);
@@ -116,18 +105,11 @@ export default function Signup() {
                   <RadioGroupItem value="email" id="email" />
                   <Label htmlFor="email" className="cursor-pointer">Email</Label>
                 </div>
-                <div className="flex items-center space-x-2 opacity-50">
-                  <RadioGroupItem value="phone" id="phone" disabled />
-                  <Label htmlFor="phone" className="cursor-not-allowed">
-                    Phone (Coming Soon)
-                  </Label>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="phone" id="phone" />
+                  <Label htmlFor="phone" className="cursor-pointer">Phone</Label>
                 </div>
               </RadioGroup>
-              {contactType === 'phone' && (
-                <p className="text-xs text-muted-foreground">
-                  SMS verification is temporarily unavailable. Please use email.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">

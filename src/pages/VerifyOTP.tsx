@@ -38,11 +38,10 @@ export default function VerifyOTP() {
         .select('*')
         .eq('contact', signupData.contact)
         .eq('otp_code', otp)
-        .eq('verified', false)
-        .maybeSingle();
+        .single();
 
       if (otpError || !otpData) {
-        throw new Error('Invalid or expired verification code. Please try again.');
+        throw new Error('Invalid verification code');
       }
 
       // Check if OTP is expired (5 minutes)
@@ -51,14 +50,7 @@ export default function VerifyOTP() {
       const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
       if (diffMinutes > 5) {
-        throw new Error('Verification code has expired. Please request a new one.');
-      }
-
-      // Check if account already exists
-      const { data: { user: existingUser }, error: checkError } = await supabase.auth.getUser();
-      
-      if (existingUser?.email === signupData.contact) {
-        throw new Error('An account with this email already exists. Please login instead.');
+        throw new Error('Verification code has expired');
       }
 
       // Create Supabase account
@@ -70,16 +62,10 @@ export default function VerifyOTP() {
             full_name: signupData.fullName,
             phone: signupData.contactType === 'phone' ? signupData.contact : null,
           },
-          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          throw new Error('An account with this email already exists. Please login instead.');
-        }
-        throw authError;
-      }
+      if (authError) throw authError;
 
       // Mark OTP as verified
       await supabase
@@ -90,15 +76,11 @@ export default function VerifyOTP() {
       // Clear signup data
       sessionStorage.removeItem('signup_data');
 
-      toast.success('Account created successfully! Welcome to Wanderer!');
-      
-      // Navigate to homepage
-      setTimeout(() => {
-        navigate('/');
-      }, 500);
+      toast.success('Account created successfully!');
+      navigate('/dashboard');
     } catch (error: any) {
       console.error('OTP verification error:', error);
-      toast.error(error.message || 'Failed to verify code. Please try again.');
+      toast.error(error.message || 'Failed to verify code');
     } finally {
       setIsVerifying(false);
     }
@@ -106,22 +88,26 @@ export default function VerifyOTP() {
 
   const handleResendOTP = async () => {
     try {
-      const response = await supabase.functions.invoke('send-otp', {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           contact: signupData.contact,
           contactType: signupData.contactType,
-        },
+        }),
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to resend OTP');
+      if (!response.ok) {
+        throw new Error('Failed to resend OTP');
       }
 
       toast.success('New verification code sent!');
       setOtp('');
     } catch (error: any) {
       console.error('Resend OTP error:', error);
-      toast.error(error.message || 'Failed to resend code. Please try again.');
+      toast.error(error.message || 'Failed to resend code');
     }
   };
 
