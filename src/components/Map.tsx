@@ -176,14 +176,26 @@ const FlyToLocation = ({ coords }: { coords: [number, number] }) => {
 };
 
 // ---------------------- MAP ----------------------
-const Map = () => {
+interface MapProps {
+  autoDestination?: {
+    lat: number;
+    lng: number;
+    name?: string;
+  } | null;
+  hideSearchBar?: boolean;
+}
+
+const Map = ({ autoDestination = null, hideSearchBar = false }: MapProps) => {
   const [position, setPosition] = useState<[number, number] | null>(null);
   const [destination, setDestination] = useState<[number, number] | null>(null);
+  const [destinationName, setDestinationName] = useState<string>("");
   const [route, setRoute] = useState<[number, number][]>([]);
   const [distance, setDistance] = useState<number | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [recommendation, setRecommendation] = useState<string>("");
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
+  // Get user location on mount
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
@@ -191,10 +203,20 @@ const Map = () => {
     );
   }, []);
 
+  // Handle auto-destination from props
+  useEffect(() => {
+    if (autoDestination) {
+      const destCoords: [number, number] = [autoDestination.lat, autoDestination.lng];
+      setDestination(destCoords);
+      setDestinationName(autoDestination.name || "Selected Destination");
+    }
+  }, [autoDestination]);
+
   useEffect(() => {
     const getRoute = async () => {
       if (!position || !destination) return;
 
+      setIsLoadingRoute(true);
       try {
         const url = `https://router.project-osrm.org/route/v1/driving/${position[1]},${position[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson`;
         const res = await fetch(url);
@@ -224,6 +246,8 @@ const Map = () => {
         }
       } catch (err) {
         console.error("Failed to fetch route", err);
+      } finally {
+        setIsLoadingRoute(false);
       }
     };
 
@@ -245,13 +269,47 @@ const Map = () => {
           zIndex: 1000,
         }}
       >
-        <h3 style={{ color: "#38bdf8", fontWeight: "600", fontSize: "18px" }}>
-          Search Destination
-        </h3>
+        {destinationName && (
+          <div
+            style={{
+              background: "#059669",
+              borderRadius: "10px",
+              padding: "12px",
+              fontSize: "14px",
+              fontWeight: 600,
+            }}
+          >
+            📍 Navigating to: {destinationName}
+          </div>
+        )}
 
-        <SearchBar setDestination={setDestination} />
+        {!hideSearchBar && (
+          <>
+            <h3 style={{ color: "#38bdf8", fontWeight: "600", fontSize: "18px" }}>
+              Search Destination
+            </h3>
+            <SearchBar setDestination={(coords) => {
+              setDestination(coords);
+              setDestinationName("");
+            }} />
+          </>
+        )}
 
-        {distance && duration && (
+        {isLoadingRoute && (
+          <div
+            style={{
+              background: "#334155",
+              borderRadius: "10px",
+              padding: "15px",
+              textAlign: "center",
+              fontSize: "14px",
+            }}
+          >
+            🔄 Calculating route...
+          </div>
+        )}
+
+        {distance && duration && !isLoadingRoute && (
           <div
             style={{
               background: "#334155",
@@ -321,7 +379,7 @@ const Map = () => {
           )}
           {destination && (
             <Marker position={destination} icon={markerIcon}>
-              <Popup>Destination</Popup>
+              <Popup>{destinationName || "Destination"}</Popup>
             </Marker>
           )}
           {route.length > 0 && <Polyline positions={route} color="#38bdf8" weight={5} />}
