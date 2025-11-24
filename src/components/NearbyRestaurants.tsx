@@ -59,9 +59,9 @@ const NearbyRestaurants = ({ userDistricts, userInterests }: NearbyRestaurantsPr
       if (district === "District 1") {
         municipalities.push("Bacacay", "Malilipot", "Malinao", "Santo Domingo", "Tiwi", "Tabaco");
       } else if (district === "District 2") {
-        municipalities.push("Camalig", "Guinobatan", "Ligao", "Jovellar");
+        municipalities.push("Legazpi", "Camalig", "Daraga", "Manito", "Rapu-Rapu");
       } else if (district === "District 3") {
-        municipalities.push("Legazpi", "Daraga", "Manito", "Rapu-Rapu");
+        municipalities.push("Guinobatan", "Ligao", "Oas", "Pio Duran", "Polangui", "Jovellar");
       }
     });
     

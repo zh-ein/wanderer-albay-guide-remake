@@ -65,7 +65,7 @@ const ManageSpots = () => {
     is_hidden_gem: false,
   });
 
-  const availableCategories = ["Nature", "Culture", "Adventure", "Food", "Beach", "Heritage"];
+  const availableCategories = ["Nature", "Culture", "Adventure", "Food", "Beach", "Heritage", "Cafes","ATV Rides", "Caving", "Hiking", "Churches", "Crafts", "Festivals", "Island Hopping", "Lakes", "Local Cuisine", "Museums", "Parks", "Resorts", "Waterfalls", "Snorkeling", "Street Food", "Sunset Views", "Volcanoes", "Ziplines"];
 
   useEffect(() => {
     fetchSpots();
