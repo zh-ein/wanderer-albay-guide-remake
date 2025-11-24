@@ -151,12 +151,12 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
               );
             }
             if (district === "District 2") {
-              return ["Camalig", "Guinobatan", "Ligao", "Jovellar"].some(m => 
+              return ["Legazpi", "Camalig", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
                 spot.municipality?.includes(m)
               );
             }
             if (district === "District 3") {
-              return ["Legazpi", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
+              return ["Guinobatan", "Ligao", "Oas", "Pio Duran", "Polangui", "Jovellar"].some(m => 
                 spot.municipality?.includes(m)
               );
             }
@@ -206,12 +206,12 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
             );
           }
           if (district === "District 2") {
-            return ["Camalig", "Guinobatan", "Ligao", "Jovellar"].some(m => 
+            return ["Legazpi", "Camalig", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
               acc.municipality?.includes(m)
             );
           }
           if (district === "District 3") {
-            return ["Legazpi", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
+            return ["Guinobatan", "Ligao", "Oas", "Pio Duran", "Polangui", "Jovellar"].some(m => 
               acc.municipality?.includes(m)
             );
           }
@@ -219,7 +219,7 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
         });
       });
 
-      setAccommodations(filtered.slice(0, 3));
+      setAccommodations(filtered.slice(0, 6));
     }
   };
 
@@ -245,12 +245,12 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
             );
           }
           if (district === "District 2") {
-            return ["Camalig", "Guinobatan", "Ligao", "Jovellar"].some(m => 
+            return ["Legazpi", "Camalig", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
               rest.municipality?.includes(m)
             );
           }
           if (district === "District 3") {
-            return ["Legazpi", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
+            return ["Guinobatan", "Ligao", "Oas", "Pio Duran", "Polangui", "Jovellar"].some(m => 
               rest.municipality?.includes(m)
             );
           }
@@ -258,7 +258,7 @@ const PersonalizedFeed = ({ userId }: PersonalizedFeedProps) => {
         });
       });
 
-      setRestaurants(filtered.slice(0, 3));
+      setRestaurants(filtered.slice(0, 6));
     }
   };
 

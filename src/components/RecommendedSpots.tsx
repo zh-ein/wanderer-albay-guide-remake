@@ -74,12 +74,12 @@ const RecommendedSpots = ({ preferences, userId }: RecommendedSpotsProps) => {
                 );
               }
               if (district === "District 2") {
-                return ["Camalig", "Guinobatan", "Ligao", "Jovellar"].some(m => 
+                return ["Legazpi", "Camalig", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
                   spot.municipality?.includes(m)
                 );
               }
               if (district === "District 3") {
-                return ["Legazpi", "Daraga", "Manito", "Rapu-Rapu"].some(m => 
+                return ["Guinobatan", "Ligao", "Oas", "Pio Duran", "Polangui", "Jovellar"].some(m => 
                   spot.municipality?.includes(m)
                 );
               }
